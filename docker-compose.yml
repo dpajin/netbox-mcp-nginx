@@ -1,0 +1,37 @@
+services:
+  netbox-mcp:
+    image: netboxlabs/netbox-mcp-server:${MCP_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      NETBOX_URL: ${NETBOX_URL:?set NETBOX_URL in .env}
+      NETBOX_TOKEN: ${NETBOX_TOKEN:?set NETBOX_TOKEN in .env}
+      MCP_AUTH_TOKEN: ${MCP_AUTH_TOKEN:?set MCP_AUTH_TOKEN in .env}
+      ENABLE_PLUGIN_DISCOVERY: ${ENABLE_PLUGIN_DISCOVERY:-true}
+      VERIFY_SSL: ${VERIFY_SSL:-true}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      TRANSPORT: http
+      HOST: 0.0.0.0
+      PORT: "8000"
+    # Not published to the host; reachable only by nginx on the internal network.
+    expose:
+      - "8000"
+    networks: [internal]
+
+  nginx:
+    image: nginx:stable-alpine
+    restart: unless-stopped
+    depends_on:
+      - netbox-mcp
+    # Extra error_log; "info" shows TLS handshake failures.
+    command: ["nginx", "-g", "daemon off; error_log /dev/stderr ${NGINX_LOG_LEVEL:-info};"]
+    environment:
+      HTTPS_PORT: ${HTTPS_PORT:-9999}
+    ports:
+      - "${HTTPS_PORT:-9999}:${HTTPS_PORT:-9999}"
+    volumes:
+      - ./nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ./certs:/etc/nginx/certs:ro
+    networks: [internal]
+
+networks:
+  internal:

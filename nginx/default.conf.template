@@ -1,0 +1,35 @@
+map $http_authorization $auth_present {
+    ""      no;
+    default yes;
+}
+
+log_format mcp '$remote_addr [$time_local] "$request" $status '
+               'tls=$ssl_protocol/$ssl_cipher sni=$ssl_server_name '
+               'host=$host ua="$http_user_agent" auth=$auth_present';
+
+server {
+    listen ${HTTPS_PORT} ssl;
+    http2 on;
+    server_tokens off;
+    access_log /dev/stdout mcp;
+
+    ssl_certificate     /etc/nginx/certs/server.crt;
+    ssl_certificate_key /etc/nginx/certs/server.key;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+
+    location /mcp {
+        proxy_pass http://netbox-mcp:8000/mcp;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host:$server_port;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Connection "";
+
+        # MCP streamable HTTP uses SSE; buffering would stall events.
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+    }
+}

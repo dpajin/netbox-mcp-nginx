@@ -1,0 +1,7 @@
+{
+    "httpyac.requestGotOptions": {
+        "https": {
+            "rejectUnauthorized": false
+        }
+    }
+}
